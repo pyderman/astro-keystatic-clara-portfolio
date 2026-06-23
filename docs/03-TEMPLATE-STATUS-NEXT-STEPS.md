@@ -3,15 +3,36 @@
 ## Current Status
 
 **This project (Clara Holm portfolio) is working end-to-end:**
-- ✅ Static portfolio grid (`/`) — reads from `photos` collection
+- ✅ Static portfolio grid (`/`) — reads from `photos` collection, shows title + location + year
 - ✅ About page (`/om`) — reads from `about` singleton
-- ✅ Bento page (`/bento`) — 3 random photos + live weather + clock + Spotify
-- ✅ Keystatic admin at `/keystatic` — full CRUD for all content
+- ✅ Bento page (`/bento`) — 3 featured photos + live weather + clock + Spotify
+- ✅ Keystatic admin at `/keystatic` — full CRUD for singletons
 - ✅ Deployed on Vercel, auto-rebuilds on push
 - ✅ Keystatic Cloud auth wired — editor logs in at `/keystatic` on the live site
-- ✅ All known bugs fixed (see `02-DEBUGGING-INSIGHTS.md`)
+- ✅ Spotify embed URL editable via CMS (Site settings → Spotify embed URL)
+- ⚠️ Bento photos use `featured` flag — currently hardcoded in YAML via git, CMS toggle broken (see below)
+- ❌ Featured toggle in CMS throws GraphQL error — photo entries can't be saved via the admin UI
 
 **This is a good source to copy from, but it is NOT yet a clean boilerplate.** It contains Clara-specific content (10 real photos, Danish copy, specific schema). The next step is to strip it down.
+
+---
+
+## Known Broken: CMS Featured Toggle (GraphQL Error)
+
+**What was attempted:** Added a `featured` boolean to the photos collection so editors could mark which photos appear on the bento page via the Keystatic admin.
+
+**What actually works:** The filter code in `bento.astro` is correct and reads the `featured` flag properly at build time. The 3 currently-featured photos (amager-strandpark, norreport-station, torvehallerne) show on bento correctly.
+
+**What doesn't work:** Toggling `featured` via the Keystatic admin throws:
+```
+[GraphQL] A path was requested for deletion which does not exist as of commit oid `...`
+```
+
+**Root cause:** The photo YAML files were hand-crafted (not created through Keystatic UI). Filenames with Danish characters (e.g. `assistens-kirkegaard.yaml`) likely don't match the slug Keystatic's generator computes from the title, causing the GitHub write path to fail. Singletons (`site.yaml`, `about.yaml`) save fine.
+
+**Current workaround:** Change `featured: true/false` directly in the YAML files and push via git. This bypasses the Keystatic Cloud write path entirely.
+
+**Proper solution:** See Step 2c below — a dedicated `bento` singleton with explicit image URL fields avoids the slug mismatch problem completely and gives better editorial control.
 
 ---
 
@@ -20,131 +41,116 @@
 **Process:** Copy the `keystatic-astro-test` folder to a new folder (e.g. `astro-keystatic-starter`). Then strip it down:
 
 - [ ] Replace all photos in `public/photos/` with 2–3 placeholder images
-- [ ] Replace content in `content/photos/*.yaml` with 2–3 placeholder entries
+- [ ] Replace content in `content/photos/*.yaml` with 2–3 placeholder entries **created through the Keystatic UI** (not hand-crafted) to avoid slug mismatch issues
 - [ ] Replace `content/site.yaml` with generic placeholder values
 - [ ] Replace `content/about.yaml` with placeholder values
-- [ ] Remove `content/photos/` entries down to 2–3 max
 - [ ] Rename the project in `package.json` to `astro-keystatic-starter`
 - [ ] Update `keystatic.config.ts` — remove the `cloud.project` value (leave as placeholder)
 - [ ] Create a new GitHub repo for the starter
-- [ ] Update the README with setup instructions
+- [ ] Add a README with setup instructions
 
-The boilerplate should be deployable in under 30 minutes for a new project.
+**Important:** In the boilerplate, create all initial collection entries through `/keystatic` so Keystatic controls the filename generation. Hand-crafting YAML files directly risks slug mismatch errors in Cloud mode.
 
 ---
 
-## Step 2 — Improve the Bento Page
+## Step 2 — Fix Bento Photo Selection
 
-### 2a. Let editor select which photos appear (quick win — already possible)
+### Option A — Fix the existing `featured` approach (medium effort)
 
-The `photos` collection already has a `featured` boolean field. Right now bento picks 3 photos at **random**. Change it to pick the 3 most-recently-added featured photos instead:
+The slug mismatch is likely caused by Danish characters in filenames. Two sub-options:
 
-```ts
-// bento.astro — replace the shuffle with this
-const featured = allPhotos
-  .filter(p => p.entry.featured)
-  .slice(0, 3);
-const [p1, p2, p3] = featured;
-```
+**A1 — Rename files to match Keystatic's slug output:**
+Run a test to see what slug Keystatic generates for each photo title (create a test entry through the UI and observe the filename). Rename any mismatched files to match. This fixes the GraphQL error for existing entries.
 
-**Editor flow:** Go to `/keystatic` → Photos → open a photo → toggle "Featured" on. Up to 3 featured photos appear in the bento. Simple, no new schema needed.
+**A2 — Recreate all photo entries through the Keystatic UI:**
+Delete the hand-crafted YAML files, recreate each photo entry through `/keystatic` → Photos → New. Keystatic controls the filename, so slugs always match. More work upfront but permanently correct.
 
-### 2b. Make the number of bento photo slots configurable
+### Option B — Dedicated bento singleton (recommended, cleanest)
 
-Currently the layout is hardcoded to 3 photo slots. To make this flexible you'd need to:
-- Add a `bento_photo_count` field (1, 2, or 3) to the `site` singleton
-- Conditionally render photo slots in bento.astro based on that value
-- Adjust the CSS grid template accordingly
+Replace the `featured` flag approach with a `bento` singleton that has explicit image URL fields. This completely sidesteps the slug mismatch problem.
 
-This is a medium-effort change — worth doing in the boilerplate but not critical for the Clara project.
-
-### 2c. Add a dedicated bento singleton (optional, more control)
-
-For full editorial control over the bento page, add a `bento` singleton to `keystatic.config.ts`:
-
+**Add to `keystatic.config.ts`:**
 ```ts
 bento: singleton({
   label: 'Bento page',
   path: 'content/bento',
   format: { data: 'yaml' },
   schema: {
-    photo_1: fields.relationship({ label: 'Photo 1', collection: 'photos' }),
-    photo_2: fields.relationship({ label: 'Photo 2', collection: 'photos' }),
-    photo_3: fields.relationship({ label: 'Photo 3', collection: 'photos' }),
-    spotify_url: fields.url({ label: 'Spotify embed URL' }),
+    photo_1: fields.image({
+      label: 'Photo 1',
+      directory: 'public/photos',
+      publicPath: '/photos/',
+    }),
+    photo_2: fields.image({
+      label: 'Photo 2',
+      directory: 'public/photos',
+      publicPath: '/photos/',
+    }),
+    photo_3: fields.image({
+      label: 'Photo 3',
+      directory: 'public/photos',
+      publicPath: '/photos/',
+    }),
   },
 }),
 ```
 
-This gives the editor a dedicated page to pick exactly which photos appear and which Spotify playlist plays.
+**Create `content/bento.yaml`:**
+```yaml
+photo_1: /photos/2025-spring-random-5.webp
+photo_2: /photos/2025-spring-random-2.webp
+photo_3: /photos/IMG_1888.webp
+```
 
-> **Note:** `fields.relationship()` requires Keystatic Cloud or GitHub mode to resolve cross-references. For local dev or simpler setups, using the `featured` flag (2a) is easier.
+**Update `bento.astro`** to read from the bento singleton instead of filtering the photos collection.
+
+**Why this is better:**
+- Editor picks exactly which images appear — no relying on a flag spread across 10 YAML files
+- Saves against singletons work fine (no slug mismatch risk)
+- Editor can upload a brand new image directly to the bento page without adding it to the portfolio grid
+- Could later allow different image counts per box (1–3 photos)
+
+**Effort:** ~1.5 hours
 
 ---
 
 ## Step 3 — The Widgets (Weather, Clock, Spotify)
 
 ### Weather Widget
-**Current state:** Client-side React component, fetches live from Open-Meteo API, hardcoded to Copenhagen coordinates.
+**Current state:** ✅ Client-side React component, fetches live from Open-Meteo API. Hardcoded to Copenhagen coordinates.
 
-**Can it be CMS-editable?** Yes, but probably not worth it for a personal portfolio. If you want it:
-- Add `weather_city`, `weather_lat`, `weather_lng` fields to the `site` singleton
-- Pass them as props to `WeatherWidget`
-
-For a multi-client boilerplate this makes sense. For a single-person portfolio it's overkill.
-
-**Simpler alternative:** Just hardcode the city to whatever the photographer's base city is and leave it.
+**CMS-editable?** Possible but not worth it for a single-person portfolio. If needed for the boilerplate:
+- Add `weather_lat`, `weather_lng` fields to the `site` singleton
+- Pass as props to `WeatherWidget`
 
 ### Clock Widget
-**Current state:** Client-side React, shows current local time of the visitor's browser.
+**Current state:** ✅ Client-side React, shows visitor's local time.
 
-**CMS-editable?** No reason to make this editable. It's a live clock, always correct.
-
-**Optional improvement:** Could show Copenhagen time specifically (using a timezone prop) rather than visitor's local time. Add `timezone` field to `site` singleton if desired.
+**CMS-editable?** No. Leave as-is.
 
 ### Spotify Widget
-**Current state:** Hardcoded embed URL in `bento.astro` pointing to a Deep Focus playlist.
+**Current state:** ✅ **Done and working.** Editable via `/keystatic` → Site settings → Spotify embed URL.
 
-**Can it be CMS-editable?** Yes, and this is actually worth doing. It's a simple field:
-
-1. Add to `site` singleton in `keystatic.config.ts`:
-```ts
-spotify_embed_url: fields.url({ label: 'Spotify playlist embed URL' }),
-```
-
-2. In `bento.astro`, read it:
-```astro
-const spotifyUrl = site?.spotify_embed_url ?? 'https://open.spotify.com/embed/playlist/37i9dQZF1DWZeKCadgRdKQ?utm_source=generator';
-```
-
-3. Use in the iframe:
-```astro
-<iframe src={spotifyUrl} ...></iframe>
-```
-
-**Editor flow:** In Spotify, right-click a playlist → Share → Copy link. Paste into the Keystatic admin field. Done.
-
-> To get the embed URL from a Spotify share link, replace `open.spotify.com/playlist/` with `open.spotify.com/embed/playlist/` and add `?utm_source=generator`.
+**How to update:** Go to Spotify → right-click any playlist → Share → Copy link. Paste the URL into the Keystatic field. The share URL format works — Spotify's embed player accepts the extra parameters.
 
 ---
 
 ## Recommended Next Actions (Priority Order)
 
-| Priority | Task | Effort |
-|---|---|---|
-| 1 | Implement featured photo filter for bento (2a) | 15 min |
-| 2 | Add Spotify URL field to site singleton | 20 min |
-| 3 | Strip Clara content → create clean boilerplate folder | 1 hour |
-| 4 | Push boilerplate to its own GitHub repo | 15 min |
-| 5 | Add `bento_photo_count` config (2b) | 1–2 hours |
-| 6 | Add dedicated bento singleton with photo picker (2c) | 2–3 hours |
-| 7 | Evaluate Keystatic Cloud Pro + Cloud Images if photos outgrow the repo | When needed |
+| Priority | Task | Effort | Status |
+|---|---|---|---|
+| 1 | Implement bento singleton with image pickers (Option B above) | 1.5 hours | ⬜ Todo |
+| 2 | Strip Clara content → create clean boilerplate folder | 1 hour | ⬜ Todo |
+| 3 | Push boilerplate to its own GitHub repo | 15 min | ⬜ Todo |
+| 4 | In boilerplate: create all photo entries through CMS UI, not by hand | — | ⬜ Todo |
+| 5 | Investigate slug mismatch for existing entries (Option A) | 1–2 hours | ⬜ Optional |
+| 6 | Evaluate Keystatic Cloud Pro + Cloud Images if photos outgrow the repo | — | ⬜ When needed |
 
 ---
 
 ## Known Remaining Quirks
 
-- **Bento photos are random** on every build — switching to `featured` flag (Step 2a) removes this
+- **Featured toggle in CMS broken** — GraphQL error when saving photo entries; use git to edit YAML directly until bento singleton (Step 2 Option B) is implemented
 - **`@keystatic/astro` doesn't officially support Astro 7** — watch for a new release; remove `.npmrc` `legacy-peer-deps` when it lands
 - **Images live in the git repo** — fine up to ~50 photos at 200–400KB each. Beyond that, switch to Keystatic Cloud Images or Cloudinary
-- **Bento is static** — rebuilds on content changes, so weather shown at build time would be stale (but we solved this by making weather client-side)
+- **Bento is statically prerendered** — content changes require a Vercel rebuild (~30s). Weather and clock are client-side so always live
