@@ -45,6 +45,7 @@ export default config({
         tagline: fields.text({ label: 'Tagline' }),
         email: fields.text({ label: 'Email' }),
         instagram: fields.text({ label: 'Instagram handle' }),
+        spotify_embed_url: fields.url({ label: 'Spotify embed URL', description: 'From Spotify: right-click playlist → Share → Copy link, then replace open.spotify.com/playlist/ with open.spotify.com/embed/playlist/' }),
       },
     }),
     about: singleton({
