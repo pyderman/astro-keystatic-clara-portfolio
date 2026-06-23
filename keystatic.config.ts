@@ -21,7 +21,7 @@ export default config({
       path: 'content/photos/*',
       format: { data: 'yaml' },
       schema: {
-        title: fields.text({ label: 'Title' }),
+        title: fields.slug({ name: { label: 'Title' } }),
         location: fields.text({ label: 'Location' }),
         year: fields.integer({ label: 'Year' }),
         image: fields.image({
