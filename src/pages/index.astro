@@ -1,0 +1,85 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { createReader } from '@keystatic/core/reader';
+import keystaticConfig from '../../keystatic.config';
+
+const reader = createReader(process.cwd(), keystaticConfig);
+const site = await reader.singletons.site.read();
+const allPhotos = await reader.collections.photos.all();
+
+const photos = allPhotos.sort((a, b) => {
+  if (a.entry.featured && !b.entry.featured) return -1;
+  if (!a.entry.featured && b.entry.featured) return 1;
+  return (b.entry.year ?? 0) - (a.entry.year ?? 0);
+});
+---
+
+<Layout title={site?.name ?? 'Portfolio'}>
+  <header class="px-6 py-12 md:px-16 flex items-end justify-between">
+    <div>
+      <h1 class="text-5xl md:text-7xl font-light tracking-tight leading-none">
+        {site?.name ?? 'Portfolio'}
+      </h1>
+      {site?.tagline && (
+        <p class="mt-3 text-base text-gray-400">{site.tagline}</p>
+      )}
+    </div>
+    <nav>
+      <a href="/om" class="text-sm text-gray-400 hover:text-gray-900 transition-colors">
+        Om →
+      </a>
+    </nav>
+  </header>
+
+  <main class="px-6 md:px-16 pb-24">
+    {photos.length === 0 ? (
+      <p class="text-gray-300 text-sm mt-8">
+        Ingen billeder endnu — tilføj via{' '}
+        <a href="/keystatic" class="underline hover:text-gray-600">/keystatic</a>
+      </p>
+    ) : (
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
+        {photos.map(({ slug, entry }) => (
+          <article>
+            {entry.image ? (
+              <img
+                src={entry.image}
+                alt={entry.alt_text ?? entry.title}
+                class="w-full aspect-[3/4] object-cover bg-gray-100"
+                loading="lazy"
+              />
+            ) : (
+              <div class="w-full aspect-[3/4] bg-gray-100" />
+            )}
+            <div class="mt-2 space-y-0.5">
+              <p class="text-sm font-medium">{entry.title}</p>
+              <p class="text-xs text-gray-400">
+                {[entry.location, entry.year].filter(Boolean).join(', ')}
+              </p>
+            </div>
+          </article>
+        ))}
+      </div>
+    )}
+  </main>
+
+  <footer class="px-6 md:px-16 py-8 border-t border-gray-100">
+    <div class="flex gap-6 text-sm text-gray-400">
+      {site?.email && (
+        <a href={`mailto:${site.email}`} class="hover:text-gray-900 transition-colors">
+          {site.email}
+        </a>
+      )}
+      {site?.instagram && (
+        <a
+          href={`https://instagram.com/${site.instagram}`}
+          class="hover:text-gray-900 transition-colors"
+          target="_blank"
+          rel="noopener"
+        >
+          @{site.instagram}
+        </a>
+      )}
+    </div>
+  </footer>
+</Layout>

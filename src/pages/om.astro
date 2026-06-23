@@ -1,0 +1,60 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { createReader } from '@keystatic/core/reader';
+import keystaticConfig from '../../keystatic.config';
+
+const reader = createReader(process.cwd(), keystaticConfig);
+const site = await reader.singletons.site.read();
+const about = await reader.singletons.about.read();
+---
+
+<Layout title={`Om — ${site?.name ?? 'Portfolio'}`}>
+  <header class="px-6 py-8 md:px-16">
+    <a href="/" class="text-sm text-gray-400 hover:text-gray-900 transition-colors">
+      ← {site?.name ?? 'Portfolio'}
+    </a>
+  </header>
+
+  <main class="px-6 md:px-16 pb-24 max-w-2xl">
+    {about?.portrait && (
+      <img
+        src={about.portrait}
+        alt={about.portrait_alt ?? site?.name ?? ''}
+        class="w-64 aspect-[3/4] object-cover bg-gray-100 mb-10"
+      />
+    )}
+
+    <h1 class="text-4xl font-light tracking-tight mb-8">{site?.name}</h1>
+
+    {about?.bio && (
+      <div class="mb-10 space-y-4">
+        {about.bio.split('\n\n').map((paragraph) => (
+          <p class="text-gray-600 leading-relaxed">{paragraph}</p>
+        ))}
+      </div>
+    )}
+
+    {about?.clients && about.clients.length > 0 && (
+      <section class="mb-10">
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-300 mb-4">
+          Klienter & publikationer
+        </h2>
+        <ul class="space-y-1">
+          {about.clients.map((client) => (
+            <li class="text-gray-600">{client}</li>
+          ))}
+        </ul>
+      </section>
+    )}
+
+    {about?.cv_url && (
+      <a
+        href={about.cv_url}
+        class="inline-block text-sm border border-gray-900 px-5 py-2.5 hover:bg-gray-900 hover:text-white transition-colors"
+        download
+      >
+        Download CV
+      </a>
+    )}
+  </main>
+</Layout>
