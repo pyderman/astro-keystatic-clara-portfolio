@@ -1,10 +1,9 @@
 ---
-export const prerender = false;
-
 import '../styles/global.css';
 import { createReader } from '@keystatic/core/reader';
 import keystaticConfig from '../../keystatic.config';
 import Clock from '../components/Clock';
+import WeatherWidget from '../components/WeatherWidget';
 
 const reader = createReader(process.cwd(), keystaticConfig);
 const site = await reader.singletons.site.read();
@@ -12,25 +11,6 @@ const allPhotos = await reader.collections.photos.all();
 
 const shuffled = [...allPhotos].sort(() => Math.random() - 0.5);
 const [p1, p2, p3] = shuffled;
-
-let weather: { temp: number; emoji: string; label: string } | null = null;
-try {
-  const res = await fetch(
-    'https://api.open-meteo.com/v1/forecast?latitude=55.6761&longitude=12.5683&current=temperature_2m,weather_code&timezone=Europe%2FCopenhagen'
-  );
-  const data = await res.json();
-  const code: number = data.current.weather_code;
-  const temp = Math.round(data.current.temperature_2m);
-  const cond =
-    code === 0   ? { emoji: '☀️', label: 'Klart' }
-    : code <= 3  ? { emoji: '⛅', label: 'Delvist skyet' }
-    : code <= 48 ? { emoji: '🌫️', label: 'Tåge' }
-    : code <= 67 ? { emoji: '🌧️', label: 'Regn' }
-    : code <= 77 ? { emoji: '❄️', label: 'Sne' }
-    : code <= 82 ? { emoji: '🌦️', label: 'Byger' }
-    : { emoji: '⛈️', label: 'Tordenvejr' };
-  weather = { temp, ...cond };
-} catch { /* degrade silently */ }
 ---
 
 <!doctype html>
@@ -73,15 +53,7 @@ try {
       <!-- Weather -->
       <div class="cell weather card">
         <span class="label">Vejr · København</span>
-        {weather ? (
-          <div class="weather-body">
-            <span class="weather-emoji">{weather.emoji}</span>
-            <span class="weather-temp">{weather.temp}°</span>
-            <span class="weather-label">{weather.label}</span>
-          </div>
-        ) : (
-          <span class="muted">—</span>
-        )}
+        <WeatherWidget client:load />
         <span class="muted">Open-Meteo · live</span>
       </div>
 

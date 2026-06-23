@@ -3,8 +3,12 @@ import { config, collection, singleton, fields } from '@keystatic/core';
 export default config({
   storage:
     import.meta.env.MODE === 'production'
-      ? { kind: 'github', repo: 'pyderman/clara-holm-portfolio' }
+      ? { kind: 'cloud' }
       : { kind: 'local' },
+
+  cloud: {
+    project: 'puzzled-studio-team/astro-keystatic-cla',
+  },
 
   ui: {
     brand: { name: 'Clara Holm' },
